@@ -1,0 +1,14 @@
+[
+    {
+        "name": "ダーツハイブ",
+        "url": "https://www.dartshive.jp/shopdetail/000000030962/",
+        "find_tag": "strong",
+        "find_attrs": {"id": "btocOnly"}
+    },
+    {
+        "name": "TiTO",
+        "url": "https://www.tito-shop.com/product/detail/st-tit-004-",
+        "find_tag": "span",
+        "find_attrs": {"class": "discount_value"}
+    }
+]
