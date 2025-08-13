@@ -33,8 +33,8 @@
 
 ## セットアップ
 ```bash
-git clone https://github.com/maream1017/VisualStudioCode
-cd VisualStudioCode
+git clone https://github.com/maream1017/Darts_Price_Checker
+cd Darts_Price_Checker
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
