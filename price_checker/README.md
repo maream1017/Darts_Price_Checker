@@ -33,8 +33,8 @@
 
 ## セットアップ
 ```bash
-git clone https://github.com/maream1017/my-python-project
-cd my-python-project
+git clone https://github.com/maream1017/VisualStudioCode
+cd VisualStudioCode
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
