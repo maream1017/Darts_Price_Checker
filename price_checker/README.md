@@ -1,53 +1,46 @@
 # Price Checker (Darts)
 
-ダーツ関連ECの価格を定期チェックし、前回から変化があれば通知します。  
-ポートフォリオ向けの最小実装で、サイトの構成変化に強い価格抽出と、Webhook通知（任意）を備えています。
+ダーツ関連ECサイトの価格を定期チェックし、前回との差分があれば通知するツールです。  
+趣味での購入検討をきっかけに「価格の上げ下げを自動で追いたい」というニーズから作りました。  
+**単一ファイル（`price_checker.py`）で動作**し、常時起動すれば8時間ごとに価格を確認します。
 
-## 特徴
-- 複数サイトの価格を取得して前回値と比較
-- 取得失敗/セレクタ変更を検知してログ出力
-- Webhook（Discordなど）での通知に対応（任意）
-- `.env` で秘密情報を管理、`data/` に履歴保存
+---
+
+## 使える場面
+- セールの値下げをすぐ知りたい
+- 値段の変動を履歴として残したい
+- Discordで通知を受け取りたい（任意）
+
+---
+
+## 主な機能
+- 複数サイトの価格を取得し、**前回値と比較して変化を検出**
+- HTML構造が変わっても拾えるよう、**簡易フォールバック**でテキスト全体から価格抽出
+- **Webhook通知（任意）**：`.env` にURLを設定した場合のみ Discord 等へ通知
+- 秘密情報は `.env` で管理、履歴は `data/` に保存
+
+> **「任意」とは？**  
+> Webhook を設定しなくてもツールは動作します（標準出力とファイル保存）。  
+> Webhook URL を設定すると、価格変化や取得失敗を Discord に通知します。
+
+---
+
+## 動作環境
+- Python **3.10以上**（3.10/3.11で動作確認）
+- macOS / Windows / Linux いずれも可
+
+---
 
 ## セットアップ
 ```bash
-git clone <YOUR_REPO_URL>
+git clone https://github.com/maream1017/my-python-project
 cd my-python-project
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env   # 必要ならWebhook URLを設定
+
+# Webhook を使う場合のみ（任意）
+cp .env.example .env
+# .env に以下を記入:
+# DISCORD_WEBHOOK_URL=（DiscordのWebhook URL。使わない場合は空でOK）
+
 mkdir -p data
-```
-
-## 使い方
-```bash
-python src/price_checker.py
-```
-出力例：
-```
-[ダーツハイブ] 現在: 12800 / 前回: 12600
-価格変更: {"site":"ダーツハイブ","previous":"12600","current":"12800","event":"price_changed"}
-```
-
-## 環境変数（任意）
-`.env`
-```
-DISCORD_WEBHOOK_URL= # 空のままでOK。使うときだけ設定
-```
-
-## 設定（監視対象の追加）
-`src/price_checker.py` の `SITES` に辞書を追加してください。
-```python
-SITES = [
-  {"name": "ダーツハイブ", "url": "...", "find_tag": "strong", "find_attrs": {"id": "btocOnly"}},
-  {"name": "TiTO", "url": "...", "find_tag": "span", "find_attrs": {"class": "discount_value"}},
-]
-```
-
-## 注意事項（必読）
-- 対象サイトの **利用規約 / robots.txt** に従ってください。
-- リクエストの間隔を空け、過度なアクセスはしないでください。
-- 本ツールは学習・検証目的のサンプルです。利用は自己責任でお願いします。
-
-## ライセンス
-MIT

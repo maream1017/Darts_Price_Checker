@@ -1,16 +1,21 @@
-# src/price_checker.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os, re, json, time, logging
+from pathlib import Path
+
 import requests
 from bs4 import BeautifulSoup
-from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")  # 実値は.envに
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 DATA_DIR = Path("data"); DATA_DIR.mkdir(exist_ok=True)
 
 HEADERS = {
-    "User-Agent": "PriceChecker/1.0 (+https://github.com/<yourname>; purpose=portfolio)"
+    "User-Agent": "PriceChecker/1.0 (+https://github.com/maream1017; purpose=portfolio)"
 }
 
 SITES = [
@@ -28,48 +33,65 @@ SITES = [
     },
 ]
 
+def _sanitize(name: str) -> str:
+    return re.sub(r'[\\/:*?"<>|]+', "_", name)
+
 def extract_price(text: str) -> str:
     t = text.replace(",", "").replace("\n", "")
-    m = re.search(r"\d{3,}", t)  # 3桁以上の数値を価格候補として抽出
+    t = t.replace("円（税込）", "").replace("税込:", "").replace("円(税抜:", " ")
+    m = re.search(r"\d{3,}", t)
     return m.group(0) if m else "価格取得失敗"
 
-def get_price(url, find_tag, find_attrs, timeout=10):
+def get_price(url: str, find_tag: str, find_attrs: dict) -> str:
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=timeout)  # verify=True (デフォルト)
-        resp.encoding = resp.apparent_encoding
-        soup = BeautifulSoup(resp.text, "html.parser")
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        r.encoding = r.apparent_encoding
+        soup = BeautifulSoup(r.text, "html.parser")
         tag = soup.find(find_tag, find_attrs)
         if tag:
-            return extract_price(tag.get_text())
-        return "価格取得失敗"
+            price = extract_price(tag.get_text())
+            if price != "価格取得失敗":
+                return price
+        return extract_price(soup.get_text())
     except Exception as e:
-        logging.warning("Error fetching %s: %s", url, e)
+        logging.warning("%s の価格取得でエラー: %s", url, e)
         return "価格取得失敗"
+
+def send_webhook(message: dict) -> None:
+    if not DISCORD_WEBHOOK_URL:
+        return
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"content": json.dumps(message, ensure_ascii=False)}, timeout=10)
+    except Exception as e:
+        logging.warning("Webhook送信失敗: %s", e)
 
 def load_prev(site_name: str) -> str:
-    f = DATA_DIR / f"price_{site_name}.txt"
+    f = DATA_DIR / f"price_{_sanitize(site_name)}.txt"
     return f.read_text(encoding="utf-8") if f.exists() else ""
 
-def save_curr(site_name: str, price: str):
-    (DATA_DIR / f"price_{site_name}.txt").write_text(price, encoding="utf-8")
+def save_curr(site_name: str, price: str) -> None:
+    (DATA_DIR / f"price_{_sanitize(site_name)}.txt").write_text(price, encoding="utf-8")
 
-def main(sites=SITES, sleep_sec=1):
+def check_prices(sites=SITES):
     for s in sites:
         name, url = s["name"], s["url"]
         curr = get_price(url, s["find_tag"], s["find_attrs"])
         prev = load_prev(name)
         print(f"[{name}] 現在: {curr} / 前回: {prev or '(なし)'}")
-        if prev and curr not in ("価格取得失敗", prev) and curr != "":
-            msg = {
-                "site": name, "url": url,
-                "previous": prev, "current": curr,
-                "event": "price_changed"
-            }
+
+        if curr == "価格取得失敗":
+            msg = {"event":"price_failed","site":name,"url":url,"previous":prev,"current":curr}
+            print("価格取得失敗:", json.dumps(msg, ensure_ascii=False))
+            send_webhook(msg)
+        elif prev and curr not in ("価格取得失敗", prev) and curr != "":
+            msg = {"event":"price_changed","site":name,"url":url,"previous":prev,"current":curr}
             print("価格変更:", json.dumps(msg, ensure_ascii=False))
-            # ここでWebhook送信（環境変数がある時だけ）
-            # if DISCORD_WEBHOOK_URL: requests.post(DISCORD_WEBHOOK_URL, json={"content": str(msg)}, timeout=10)
+            send_webhook(msg)
+
         save_curr(name, curr)
-        time.sleep(sleep_sec)
 
 if __name__ == "__main__":
-    main()
+    while True:
+        check_prices()
+        print("=== 次のチェックまで8時間待機 ===")
+        time.sleep(8 * 60 * 60)

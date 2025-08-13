@@ -1,0 +1,12 @@
+# 環境変数ファイル（秘密情報）
+.env
+
+# Pythonキャッシュ/ビルドファイル
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# data
+data/
