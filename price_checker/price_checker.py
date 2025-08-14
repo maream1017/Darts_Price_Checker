@@ -48,14 +48,20 @@ def extract_price(text: str) -> str:
 def get_price(url: str, find_tag: str, find_attrs: dict) -> str:
     try:
         r = requests.get(url, headers=HEADERS, timeout=10)
+        r.raise_for_status()  # HTTPエラー検出（任意）
         r.encoding = r.apparent_encoding
         soup = BeautifulSoup(r.text, "html.parser")
+
         tag = soup.find(find_tag, find_attrs)
         if tag:
             return extract_price(tag.get_text())
+
+        # タグが見つからない場合は全文から抽出
+        return extract_price(soup.get_text(separator=" ", strip=True))
+
     except ValueError as e:
         raise e
-    
+
 def send_webhook(message: dict) -> None:
     if not DISCORD_WEBHOOK_URL:
         return
@@ -76,13 +82,13 @@ def check_prices(sites=SITES):
         name, url = s["name"], s["url"]
         try:
             curr = get_price(url, s["find_tag"], s["find_attrs"])
-        except ValueError as e:
+        except Exception as e:
             logging.warning("%s の価格取得でエラー: %s", name, e)
-            msg = {"event":"price_failed","site":name,"url":url,"previous":prev,"current":curr}
+            msg = {"event":"price_failed","site":name,"url":url,"previous":"", "current":""}
             print("価格取得失敗:", json.dumps(msg, ensure_ascii=False))
             send_webhook(msg)
             continue
-        
+
         prev = load_prev(name)
         print(f"[{name}] 現在: {curr} / 前回: {prev or '(なし)'}")
 
