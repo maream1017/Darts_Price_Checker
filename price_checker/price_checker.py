@@ -40,7 +40,10 @@ def extract_price(text: str) -> str:
     t = text.replace(",", "").replace("\n", "")
     t = t.replace("円（税込）", "").replace("税込:", "").replace("円(税抜:", " ")
     m = re.search(r"\d{3,}", t)
-    return m.group(0) if m else "価格取得失敗"
+    if m:
+        return m.group(0)
+    else:
+        raise ValueError("価格抽出失敗")
 
 def get_price(url: str, find_tag: str, find_attrs: dict) -> str:
     try:
@@ -49,14 +52,10 @@ def get_price(url: str, find_tag: str, find_attrs: dict) -> str:
         soup = BeautifulSoup(r.text, "html.parser")
         tag = soup.find(find_tag, find_attrs)
         if tag:
-            price = extract_price(tag.get_text())
-            if price != "価格取得失敗":
-                return price
-        return extract_price(soup.get_text())
-    except Exception as e:
-        logging.warning("%s の価格取得でエラー: %s", url, e)
-        return "価格取得失敗"
-
+            return extract_price(tag.get_text())
+    except ValueError as e:
+        raise e
+    
 def send_webhook(message: dict) -> None:
     if not DISCORD_WEBHOOK_URL:
         return
@@ -75,15 +74,19 @@ def save_curr(site_name: str, price: str) -> None:
 def check_prices(sites=SITES):
     for s in sites:
         name, url = s["name"], s["url"]
-        curr = get_price(url, s["find_tag"], s["find_attrs"])
-        prev = load_prev(name)
-        print(f"[{name}] 現在: {curr} / 前回: {prev or '(なし)'}")
-
-        if curr == "価格取得失敗":
+        try:
+            curr = get_price(url, s["find_tag"], s["find_attrs"])
+        except ValueError as e:
+            logging.warning("%s の価格取得でエラー: %s", name, e)
             msg = {"event":"price_failed","site":name,"url":url,"previous":prev,"current":curr}
             print("価格取得失敗:", json.dumps(msg, ensure_ascii=False))
             send_webhook(msg)
-        elif prev and curr not in ("価格取得失敗", prev) and curr != "":
+            continue
+        
+        prev = load_prev(name)
+        print(f"[{name}] 現在: {curr} / 前回: {prev or '(なし)'}")
+
+        if prev and curr not in (prev, ""):
             msg = {"event":"price_changed","site":name,"url":url,"previous":prev,"current":curr}
             print("価格変更:", json.dumps(msg, ensure_ascii=False))
             send_webhook(msg)
